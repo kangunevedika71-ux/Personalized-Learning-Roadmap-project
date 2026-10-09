@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Sign up — PathGen{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  {% include "partials/auth_side.html" with heading="A few questions. Then your whole path forward." blurb="Verify your mobile number with a one-time password, answer a short questionnaire, and get a roadmap built around what you already know." %}
+  <div class="auth-form-panel">
+    <div class="auth-card">
+      <h2>Create your account</h2>
+      <p class="sub">Just your name and mobile number.</p>
+      {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="field">
+          <label for="id_name">Your name</label>
+          {{ form.name }}
+          {% if form.name.errors %}<ul class="form-errors">{% for e in form.name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="field">
+          <label for="id_phone">Mobile number</label>
+          <div class="phone-row"><span class="phone-prefix">+91</span>{{ form.phone }}</div>
+          {% if form.phone.errors %}<ul class="form-errors">{% for e in form.phone.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+          <div class="field-help">We'll text you a one-time password. No password to remember. Outside India? Type the full number starting with +.</div>
+        </div>
+        <button type="submit" class="btn btn-primary">Send OTP</button>
+      </form>
+      <div class="switch-link">Already have an account? <a href="{% url 'login' %}">Log in</a></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

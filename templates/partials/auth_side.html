@@ -1,0 +1,29 @@
+{% load static %}
+  <div class="auth-side">
+    <img src="{% static 'img/logo-icon.png' %}" alt="PathGen" class="auth-mark">
+    <h1 class="display">{{ heading }}</h1>
+    <p style="max-width:36ch;margin-top:1rem;">{{ blurb }}</p>
+    <svg class="trail-svg" viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg" overflow="visible">
+      <defs>
+        <path id="authMotionPath" d="M -10 150 C 100 150, 120 60, 220 70 S 340 160, 440 90 S 560 30, 620 60" fill="none"/>
+        <radialGradient id="authDotGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#00ABE4" stop-opacity="0.5"/>
+          <stop offset="100%" stop-color="#00ABE4" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <path d="M -10 150 C 100 150, 120 60, 220 70 S 340 160, 440 90 S 560 30, 620 60" stroke="#B9D9EC" stroke-width="3" fill="none" stroke-dasharray="2 10" stroke-linecap="round" class="hero-path-line"/>
+      <circle cx="220" cy="70" r="7" fill="#1FA971" class="hero-node n1"/>
+      <circle cx="440" cy="90" r="7" fill="#00ABE4" class="hero-node n2"/>
+      <circle cx="620" cy="60" r="7" fill="#FFFFFF" stroke="#00ABE4" stroke-width="1.5" class="hero-node n3"/>
+      <circle r="14" fill="url(#authDotGlow)">
+        <animateMotion dur="5.5s" repeatCount="indefinite" rotate="auto">
+          <mpath href="#authMotionPath"/>
+        </animateMotion>
+      </circle>
+      <circle r="4" fill="#00ABE4">
+        <animateMotion dur="5.5s" repeatCount="indefinite" rotate="auto">
+          <mpath href="#authMotionPath"/>
+        </animateMotion>
+      </circle>
+    </svg>
+  </div>

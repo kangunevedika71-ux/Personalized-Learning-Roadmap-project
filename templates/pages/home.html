@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}PathGen — Find your career path{% endblock %}
+{% block content %}
+
+<section class="hero">
+  <div class="hero-copy">
+    <div class="eyebrow">Personalized learning roadmaps</div>
+    <h1>Not sure where to start? We'll map it out.</h1>
+    <p>Studying BBA, B.Com, BA, MBA or an IT course? Tell us where you are and what career interests you &mdash; or take a 1-minute quiz if you're unsure. We'll lay out a step-by-step roadmap in plain language, with no coding needed for business careers.</p>
+    <div class="hero-actions">
+      <a href="{% url 'find-your-path' %}" class="btn btn-primary">Find your path →</a>
+      <a href="#how-it-works" class="btn btn-ghost">See how it works</a>
+    </div>
+  </div>
+  <div class="hero-visual" id="heroVisual">
+    <svg viewBox="0 0 420 360" width="100%" height="360" xmlns="http://www.w3.org/2000/svg" overflow="visible">
+      <defs>
+        <path id="heroMotionPath" d="M 40 320 C 90 260, 40 200, 100 170 S 220 190, 240 120 S 340 60, 380 30" fill="none"/>
+        <radialGradient id="dotGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#00ABE4" stop-opacity="0.5"/>
+          <stop offset="100%" stop-color="#00ABE4" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+      <path d="M 40 320 C 90 260, 40 200, 100 170 S 220 190, 240 120 S 340 60, 380 30"
+            stroke="#B9D9EC" stroke-width="4" fill="none" stroke-dasharray="2 12" stroke-linecap="round" class="hero-path-line"/>
+      <circle cx="40" cy="320" r="9" fill="#1FA971" class="hero-node n1"/>
+      <circle cx="100" cy="170" r="9" fill="#1FA971" class="hero-node n2"/>
+      <circle cx="240" cy="120" r="9" fill="#00ABE4" class="hero-node n3"/>
+      <circle cx="380" cy="30" r="10" fill="#FFFFFF" stroke="#00ABE4" stroke-width="2" class="hero-node n4"/>
+      <text x="55" y="345" font-family="Inter, sans-serif" font-size="12" fill="#55738C">Where you start</text>
+      <text x="300" y="20" font-family="Inter, sans-serif" font-size="12" fill="#0B2942" font-weight="600">Job ready</text>
+
+      <circle r="18" fill="url(#dotGlow)">
+        <animateMotion dur="5.5s" repeatCount="indefinite" rotate="auto">
+          <mpath href="#heroMotionPath"/>
+        </animateMotion>
+      </circle>
+      <circle r="5" fill="#00ABE4">
+        <animateMotion dur="5.5s" repeatCount="indefinite" rotate="auto">
+          <mpath href="#heroMotionPath"/>
+        </animateMotion>
+      </circle>
+    </svg>
+  </div>
+</section>
+
+<div class="stats-strip">
+  <div class="stat">
+    <div class="num">{{ total_careers }}+</div>
+    <div class="label">Career paths mapped</div>
+  </div>
+  <div class="stat">
+    <div class="num">{{ total_skills }}+</div>
+    <div class="label">Skills in the catalog</div>
+  </div>
+  <div class="stat">
+    <div class="num">100%</div>
+    <div class="label">Tailored to what you know</div>
+  </div>
+</div>
+
+<section class="section" id="how-it-works">
+  <h2>Three steps from "where do I start?" to "I'm done."</h2>
+  <p class="section-lead">No generic checklists. Your roadmap is built from your answers.</p>
+  <div class="steps-row">
+    <div class="step-card">
+      <div class="num">1</div>
+      <h3>Tell us where you're at</h3>
+      <p>A short questionnaire on your education, the subjects you already know, your target career, and how many hours a day you can realistically study.</p>
+    </div>
+    <div class="step-card">
+      <div class="num">2</div>
+      <h3>Get your roadmap</h3>
+      <p>We compare your known skills against what your target career actually requires, and generate an ordered roadmap of just the gaps.</p>
+    </div>
+    <div class="step-card">
+      <div class="num">3</div>
+      <h3>Track your progress</h3>
+      <p>Log hours as you go, watch your dashboard fill in, and get a straightforward "you're done" the moment your roadmap hits 100%.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section section-alt">
+  <h2>Career paths you can build toward</h2>
+  <p class="section-lead">Each path lists the skills it actually needs — no fluff.</p>
+  <div class="career-grid">
+    {% for career in careers %}
+    <div class="career-card">
+      <h3>{{ career.get_name_display }}</h3>
+      {% if career.tagline %}<p style="font-size:.85rem;margin-bottom:.6rem;">{{ career.tagline }}</p>{% endif %}
+      <div class="count">{% if not career.requires_coding %}No coding needed &middot; {% endif %}{{ career.skill_count }} skill{{ career.skill_count|pluralize }} mapped</div>
+    </div>
+    {% empty %}
+    <p>Career paths will appear here once seeded.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<div class="cta-banner">
+  <h2>Ready to find your path?</h2>
+  <p>Sign up, answer a few questions, and get a roadmap built around you.</p>
+  <a href="{% url 'find-your-path' %}" class="btn btn-primary">Find your path →</a>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  const hero = document.querySelector('.hero');
+  const visual = document.getElementById('heroVisual');
+  if (!hero || !visual || !window.matchMedia('(pointer: fine)').matches) return;
+
+  let raf = null;
+  hero.addEventListener('mousemove', (e) => {
+    const rect = hero.getBoundingClientRect();
+    const relX = (e.clientX - rect.left) / rect.width - 0.5;
+    const relY = (e.clientY - rect.top) / rect.height - 0.5;
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      visual.style.transform = `translate(${relX * 14}px, ${relY * 10}px) rotate(${relX * 1.2}deg)`;
+    });
+  });
+  hero.addEventListener('mouseleave', () => {
+    visual.style.transform = '';
+  });
+})();
+</script>
+{% endblock %}

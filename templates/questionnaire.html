@@ -1,0 +1,490 @@
+{% extends "base.html" %}
+{% block title %}Questionnaire — PathGen{% endblock %}
+{% block content %}
+{{ careers|json_script:"careers-data" }}
+<div class="container" style="max-width:780px;">
+  <div class="wizard-progress">
+    <div class="dot active" data-step="1"></div>
+    <div class="dot" data-step="2"></div>
+    <div class="dot" data-step="3"></div>
+    <div class="dot" data-step="4"></div>
+    <div class="dot" data-step="5"></div>
+    <div class="dot" data-step="6"></div>
+  </div>
+
+  <form id="wizard-form">
+    {% csrf_token %}
+
+    <!-- Step 1: Education -->
+    <div class="wizard-step active" data-step="1">
+      <h2>What are you studying?</h2>
+      <p class="hint">Any course is welcome &mdash; technical or not. This only helps us pick a good starting point. No coding knowledge is needed for business careers.</p>
+      <div class="field">
+        <label>Education</label>
+        <select name="education" id="education-select" required>
+          <option value="" disabled selected>Select your course</option>
+          <optgroup label="Business, Commerce &amp; Arts">
+            {% for e in educations %}{% if e.non_tech %}
+            <option value="{{ e.value }}" data-non-tech="1">{{ e.label }}</option>
+            {% endif %}{% endfor %}
+          </optgroup>
+          <optgroup label="Technical / Computer courses">
+            {% for e in educations %}{% if not e.non_tech %}
+            <option value="{{ e.value }}">{{ e.label }}</option>
+            {% endif %}{% endfor %}
+          </optgroup>
+        </select>
+      </div>
+    </div>
+
+    <!-- Step 2: Experience (plain language) -->
+    <div class="wizard-step" data-step="2">
+      <h2>Where are you starting from?</h2>
+      <p class="hint">Be honest &mdash; <strong>"complete beginner" is the most common answer</strong> and a perfectly good place to start.</p>
+      <input type="hidden" name="experience_level" id="experience-input" required>
+      <div class="exp-grid">
+        {% for value, label in experiences %}
+        <div class="option-card exp-card" data-value="{{ value }}">
+          <div class="exp-title">
+            {% if value == 'BEGINNER' %}Complete beginner
+            {% elif value == 'INTERMEDIATE' %}I know some basics
+            {% elif value == 'ADVANCED' %}Comfortable
+            {% else %}Experienced{% endif %}
+          </div>
+          <div class="exp-sub">
+            {% if value == 'BEGINNER' %}I'm just starting. I haven't studied this field yet.
+            {% elif value == 'INTERMEDIATE' %}I've done a course, workshop or small project.
+            {% elif value == 'ADVANCED' %}I've done real tasks &mdash; internships or serious projects.
+            {% else %}I've worked in this field professionally.{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Step 3: Career path -->
+    <div class="wizard-step" data-step="3">
+      <h2>Which career do you want to work towards?</h2>
+      <p class="hint">Not sure yet? That's normal. Take the 1-minute quiz and we'll suggest options that fit you.</p>
+
+      <button type="button" class="btn btn-ghost quiz-launch" id="btn-quiz">&#10024; Not sure? Help me choose</button>
+
+      <div class="quiz-box" id="quiz-box" hidden>
+        <div class="quiz-progress" id="quiz-progress"></div>
+        <div id="quiz-question"></div>
+        <div id="quiz-options" class="quiz-options"></div>
+        <div id="quiz-results" hidden></div>
+      </div>
+
+      <div class="stream-tabs" id="stream-tabs">
+        <button type="button" class="stream-tab active" data-stream="BUSINESS">Business &amp; Management <span>(no coding)</span></button>
+        <button type="button" class="stream-tab" data-stream="TECHNICAL">Technical / IT</button>
+      </div>
+
+      <input type="hidden" name="career" id="career-input" required>
+      <div class="career-pick-grid" id="career-pick-grid"></div>
+    </div>
+
+    <!-- Step 4: Known skills + subtopics (filtered to the chosen career) -->
+    <div class="wizard-step" data-step="4">
+      <h2>Do you already know any of this?</h2>
+      <p class="hint">
+        <strong>If you're new, just click Continue &mdash; starting from zero is completely fine.</strong>
+        Otherwise tap a subject and tick only what you already know. Everything stays on your roadmap;
+        ticked items simply start as completed.
+      </p>
+      <div class="option-grid skills-grid-long" id="skills-grid">
+        {% for skill in skills %}
+        <div class="option-card skill-card" data-skill-id="{{ skill.id }}">
+          <div class="skill-card-head">
+            <span>{{ skill.name }}</span>
+          </div>
+          {% if skill.description %}<div class="skill-desc">{{ skill.description }}</div>{% endif %}
+          <div class="skill-detail">
+            {% if skill.subtopics.all %}
+            <label class="fully-known-toggle">
+              <input type="checkbox" class="fully-known-checkbox" data-skill-id="{{ skill.id }}">
+              I know all of this already
+            </label>
+            {% regroup skill.subtopics.all by group as subtopic_groups %}
+            {% for grp in subtopic_groups %}
+            <div class="qs-subtopic-group">
+              <div class="qs-subtopic-group-title">{{ grp.grouper|default:"Topics" }}</div>
+              {% for st in grp.list %}
+              <label class="qs-subtopic-item">
+                <input type="checkbox" class="subtopic-checkbox" data-skill-id="{{ skill.id }}" value="{{ st.id }}">
+                {{ st.title }}
+              </label>
+              {% endfor %}
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="level-select-inline">
+              <label>How well do you know it?</label>
+              <select class="skill-level-select">
+                <option value="BEGINNER">Beginner</option>
+                <option value="INTERMEDIATE">Intermediate</option>
+                <option value="ADVANCED">Advanced</option>
+              </select>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Step 5: Daily study time -->
+    <div class="wizard-step" data-step="5">
+      <h2>How many hours a day can you study?</h2>
+      <p class="hint">Be realistic — this only shapes your pace, not the destination.</p>
+      <div class="slider-row">
+        <input type="range" name="daily_study_time" min="0" max="10" step="0.5" value="2" id="hours-slider">
+        <div class="slider-value" id="hours-value">2h</div>
+      </div>
+    </div>
+
+    <!-- Step 6: Days per week -->
+    <div class="wizard-step" data-step="6">
+      <h2>How many days a week can you study?</h2>
+      <p class="hint">Consistency matters more than long weekend sessions.</p>
+      <div class="slider-row">
+        <input type="range" name="study_days_per_week" min="1" max="7" step="1" value="5" id="days-slider">
+        <div class="slider-value" id="days-value">5</div>
+      </div>
+    </div>
+
+    <div id="submit-error" class="form-errors"></div>
+
+    <div class="wizard-nav">
+      <button type="button" class="btn btn-ghost" id="btn-back" style="visibility:hidden;">Back</button>
+      <button type="button" class="btn btn-primary" id="btn-next" style="width:auto;">Continue</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const totalSteps = 6;
+let currentStep = 1;
+
+const form = document.getElementById('wizard-form');
+const dots = document.querySelectorAll('.wizard-progress .dot');
+const steps = document.querySelectorAll('.wizard-step');
+const btnNext = document.getElementById('btn-next');
+const btnBack = document.getElementById('btn-back');
+const errorBox = document.getElementById('submit-error');
+
+document.getElementById('hours-slider').addEventListener('input', (e) => {
+  document.getElementById('hours-value').textContent = e.target.value + 'h';
+});
+document.getElementById('days-slider').addEventListener('input', (e) => {
+  document.getElementById('days-value').textContent = e.target.value;
+});
+
+document.querySelectorAll('.skill-card').forEach(card => {
+  card.addEventListener('click', (e) => {
+    if (e.target.tagName === 'SELECT' || e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return;
+    card.classList.toggle('selected');
+  });
+});
+
+// ---------------- Education -> default stream ----------------
+const CAREERS = JSON.parse(document.getElementById('careers-data').textContent);
+let activeStream = 'BUSINESS';
+
+document.getElementById('education-select').addEventListener('change', (e) => {
+  const opt = e.target.selectedOptions[0];
+  activeStream = opt && opt.dataset.nonTech ? 'BUSINESS' : 'TECHNICAL';
+  syncStreamTabs();
+  renderCareers();
+});
+
+// ---------------- Experience cards ----------------
+document.querySelectorAll('.exp-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.exp-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    document.getElementById('experience-input').value = card.dataset.value;
+  });
+});
+
+// ---------------- Career cards ----------------
+const careerInput = document.getElementById('career-input');
+const careerGrid = document.getElementById('career-pick-grid');
+
+function syncStreamTabs() {
+  document.querySelectorAll('.stream-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.stream === activeStream));
+}
+
+function esc(str) {
+  const d = document.createElement('div');
+  d.textContent = str == null ? '' : String(str);
+  return d.innerHTML;
+}
+
+function renderCareers() {
+  const list = CAREERS.filter(c => c.stream === activeStream);
+  if (!list.length) {
+    careerGrid.innerHTML = '<p class="hint">No careers available in this group yet.</p>';
+    return;
+  }
+  careerGrid.innerHTML = list.map(c => `
+    <div class="career-pick ${careerInput.value === c.value ? 'selected' : ''}" data-career="${esc(c.value)}">
+      <div class="career-pick-title">${esc(c.label)}
+        ${c.requires_coding ? '' : '<span class="badge-nocode">No coding</span>'}
+      </div>
+      ${c.tagline ? `<div class="career-pick-tag">${esc(c.tagline)}</div>` : ''}
+      ${c.example_roles.length ? `<div class="career-pick-roles"><strong>Jobs you can aim for:</strong> ${esc(c.example_roles.slice(0,3).join(', '))}</div>` : ''}
+    </div>`).join('');
+  careerGrid.querySelectorAll('.career-pick').forEach(el =>
+    el.addEventListener('click', () => selectCareer(el.dataset.career)));
+}
+
+function selectCareer(value) {
+  careerInput.value = value;
+  const c = CAREERS.find(x => x.value === value);
+  if (c && c.stream !== activeStream) { activeStream = c.stream; syncStreamTabs(); }
+  renderCareers();
+}
+
+document.querySelectorAll('.stream-tab').forEach(t => {
+  t.addEventListener('click', () => { activeStream = t.dataset.stream; syncStreamTabs(); renderCareers(); });
+});
+
+// ---------------- "Help me choose" quiz ----------------
+const QUIZ = [
+  { q: 'Which activity sounds the most fun to you?', opts: [
+    ['Creating posts, videos or campaigns that people love', {DIGITAL_MARKETING:3, ENTREPRENEURSHIP:1}],
+    ['Working with numbers and spreadsheets to find answers', {FINANCIAL_ANALYST:3, BUSINESS_ANALYST:2}],
+    ['Helping, guiding and understanding people', {HR_MANAGEMENT:3, SALES_BIZ_DEV:1}],
+    ['Convincing people and closing deals', {SALES_BIZ_DEV:3, ENTREPRENEURSHIP:1}],
+    ['Organising things so everything runs smoothly', {OPERATIONS_SUPPLY_CHAIN:3, BUSINESS_ANALYST:1, PRODUCT_MANAGEMENT:1}],
+    ['Building something of my own from scratch', {ENTREPRENEURSHIP:3, PRODUCT_MANAGEMENT:2}],
+  ]},
+  { q: 'In a group project, you are usually the one who...', opts: [
+    ['Comes up with creative ideas and designs', {DIGITAL_MARKETING:3, PRODUCT_MANAGEMENT:1}],
+    ['Plans, divides tasks and sets deadlines', {OPERATIONS_SUPPLY_CHAIN:2, PRODUCT_MANAGEMENT:2, BUSINESS_ANALYST:1}],
+    ['Checks the facts, data and calculations', {FINANCIAL_ANALYST:3, BUSINESS_ANALYST:2}],
+    ['Keeps everyone motivated and resolves conflicts', {HR_MANAGEMENT:3}],
+    ['Presents and speaks to outsiders', {SALES_BIZ_DEV:3, DIGITAL_MARKETING:1}],
+  ]},
+  { q: 'How do you feel about numbers and data?', opts: [
+    ['I enjoy them and like finding patterns', {FINANCIAL_ANALYST:3, BUSINESS_ANALYST:3, PRODUCT_MANAGEMENT:1}],
+    ['They are fine when I need them', {DIGITAL_MARKETING:1, OPERATIONS_SUPPLY_CHAIN:2, PRODUCT_MANAGEMENT:1, ENTREPRENEURSHIP:1}],
+    ['I prefer working with people and ideas', {HR_MANAGEMENT:2, SALES_BIZ_DEV:2, DIGITAL_MARKETING:2}],
+  ]},
+  { q: 'How do you feel about technology?', opts: [
+    ['Curious - I like understanding how apps and products work', {PRODUCT_MANAGEMENT:3, BUSINESS_ANALYST:2, DIGITAL_MARKETING:1}],
+    ['I use tools, but I do not need to know how they work', {HR_MANAGEMENT:1, SALES_BIZ_DEV:1, FINANCIAL_ANALYST:1, OPERATIONS_SUPPLY_CHAIN:1}],
+  ]},
+  { q: 'What do you want from your career in 5 years?', opts: [
+    ['A stable, respected role in a good company', {FINANCIAL_ANALYST:2, HR_MANAGEMENT:2, OPERATIONS_SUPPLY_CHAIN:2, BUSINESS_ANALYST:1}],
+    ['Fast growth and rewards for hitting targets', {SALES_BIZ_DEV:3, DIGITAL_MARKETING:2}],
+    ['To lead products or teams', {PRODUCT_MANAGEMENT:3, BUSINESS_ANALYST:1, OPERATIONS_SUPPLY_CHAIN:1}],
+    ['To run my own business', {ENTREPRENEURSHIP:4}],
+  ]},
+];
+const quizBox = document.getElementById('quiz-box');
+let quizIndex = 0;
+let quizScores = {};
+
+function renderQuiz() {
+  const resultsEl = document.getElementById('quiz-results');
+  resultsEl.hidden = true;
+  document.getElementById('quiz-question').hidden = false;
+  document.getElementById('quiz-options').hidden = false;
+  const item = QUIZ[quizIndex];
+  document.getElementById('quiz-progress').textContent = `Question ${quizIndex + 1} of ${QUIZ.length}`;
+  document.getElementById('quiz-question').innerHTML = `<h3>${esc(item.q)}</h3>`;
+  const optsEl = document.getElementById('quiz-options');
+  optsEl.innerHTML = item.opts.map((o, i) => `<button type="button" class="quiz-opt" data-i="${i}">${esc(o[0])}</button>`).join('');
+  optsEl.querySelectorAll('.quiz-opt').forEach(btn => btn.addEventListener('click', () => {
+    const weights = item.opts[parseInt(btn.dataset.i)][1];
+    Object.entries(weights).forEach(([k, v]) => quizScores[k] = (quizScores[k] || 0) + v);
+    quizIndex++;
+    quizIndex < QUIZ.length ? renderQuiz() : showQuizResults();
+  }));
+}
+
+function showQuizResults() {
+  const available = new Set(CAREERS.map(c => c.value));
+  const ranked = Object.entries(quizScores)
+    .filter(([k]) => available.has(k))
+    .sort((a, b) => b[1] - a[1]).slice(0, 3);
+  document.getElementById('quiz-progress').textContent = 'Your top matches';
+  document.getElementById('quiz-question').hidden = true;
+  document.getElementById('quiz-options').hidden = true;
+  const resultsEl = document.getElementById('quiz-results');
+  resultsEl.hidden = false;
+  resultsEl.innerHTML = ranked.map(([key], i) => {
+    const c = CAREERS.find(x => x.value === key);
+    return `<div class="quiz-result">
+      <div><div class="career-pick-title">${i === 0 ? '&#127942; ' : ''}${esc(c.label)}</div>
+      <div class="career-pick-tag">${esc(c.tagline)}</div></div>
+      <button type="button" class="btn-small quiz-pick" data-career="${esc(key)}">Choose this</button>
+    </div>`;
+  }).join('') + '<button type="button" class="btn btn-ghost" id="quiz-retake" style="margin-top:.8rem;">Retake quiz</button>';
+  resultsEl.querySelectorAll('.quiz-pick').forEach(b => b.addEventListener('click', () => {
+    selectCareer(b.dataset.career);
+    quizBox.hidden = true;
+    careerGrid.scrollIntoView({behavior: 'smooth', block: 'center'});
+  }));
+  document.getElementById('quiz-retake').addEventListener('click', () => { quizIndex = 0; quizScores = {}; renderQuiz(); });
+}
+
+document.getElementById('btn-quiz').addEventListener('click', () => {
+  quizIndex = 0; quizScores = {};
+  quizBox.hidden = false;
+  renderQuiz();
+});
+
+// ---------------- Show only the skills the chosen career needs ----------------
+function filterSkillsForCareer() {
+  const career = CAREERS.find(c => c.value === careerInput.value);
+  const allowed = new Set(career ? career.skill_ids : []);
+  document.querySelectorAll('.skill-card').forEach(card => {
+    const ok = allowed.has(parseInt(card.dataset.skillId));
+    card.style.display = ok ? '' : 'none';
+    if (!ok) {
+      card.classList.remove('selected');
+      card.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = false);
+    }
+  });
+}
+
+renderCareers();
+
+// "I know all of this already" toggles every subtopic checkbox for that skill
+document.querySelectorAll('.fully-known-checkbox').forEach(cb => {
+  cb.addEventListener('change', (e) => {
+    const skillId = e.target.dataset.skillId;
+    document.querySelectorAll(`.subtopic-checkbox[data-skill-id="${skillId}"]`).forEach(sub => {
+      sub.checked = e.target.checked;
+    });
+  });
+});
+
+// Checking any subtopic auto-selects the parent skill card
+document.querySelectorAll('.subtopic-checkbox').forEach(cb => {
+  cb.addEventListener('change', (e) => {
+    const card = e.target.closest('.skill-card');
+    const anyChecked = card.querySelectorAll('.subtopic-checkbox:checked').length > 0;
+    card.classList.toggle('selected', anyChecked);
+
+    const allChecked = card.querySelectorAll('.subtopic-checkbox').length ===
+                        card.querySelectorAll('.subtopic-checkbox:checked').length;
+    const fullyKnownBox = card.querySelector('.fully-known-checkbox');
+    if (fullyKnownBox) fullyKnownBox.checked = allChecked;
+  });
+});
+
+function showStep(n) {
+  steps.forEach(s => s.classList.toggle('active', parseInt(s.dataset.step) === n));
+  dots.forEach(d => d.classList.toggle('active', parseInt(d.dataset.step) <= n));
+  btnBack.style.visibility = n === 1 ? 'hidden' : 'visible';
+  btnNext.textContent = n === totalSteps ? 'Generate my roadmap' : 'Continue';
+  if (n === 4) filterSkillsForCareer();
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function validateStep(n) {
+  const stepEl = document.querySelector(`.wizard-step[data-step="${n}"]`);
+  const required = stepEl.querySelectorAll('[required]');
+  for (const el of required) {
+    if (!el.value) {
+      if (el.type === 'hidden') {
+        errorBox.textContent = el.id === 'career-input'
+          ? 'Please pick a career (or take the quiz) to continue.'
+          : 'Please choose the option that fits you best.';
+        return false;
+      }
+      el.reportValidity();
+      return false;
+    }
+  }
+  errorBox.textContent = '';
+  return true;
+}
+
+btnNext.addEventListener('click', async () => {
+  if (!validateStep(currentStep)) return;
+
+  if (currentStep < totalSteps) {
+    currentStep++;
+    showStep(currentStep);
+    return;
+  }
+
+  // Final submit
+  errorBox.textContent = '';
+  btnNext.disabled = true;
+  btnNext.textContent = 'Building your roadmap...';
+
+  const knownSkills = [];
+  document.querySelectorAll('.skill-card.selected').forEach(card => {
+    const skillId = parseInt(card.dataset.skillId);
+    const levelSelect = card.querySelector('.skill-level-select');
+    const subtopicBoxes = card.querySelectorAll('.subtopic-checkbox');
+    const fullyKnownBox = card.querySelector('.fully-known-checkbox');
+
+    const entry = { skill_id: skillId, skill_level: levelSelect ? levelSelect.value : 'BEGINNER' };
+
+    if (subtopicBoxes.length) {
+      entry.known_subtopic_ids = Array.from(subtopicBoxes)
+        .filter(cb => cb.checked)
+        .map(cb => parseInt(cb.value));
+      entry.fully_known = fullyKnownBox ? fullyKnownBox.checked : false;
+    } else {
+      // No subtopic breakdown for this skill -- selecting the card means "I know this".
+      entry.fully_known = true;
+    }
+    knownSkills.push(entry);
+  });
+
+  const payload = {
+    education: form.education.value,
+    experience_level: form.experience_level.value,
+    career: form.career.value,
+    daily_study_time: parseFloat(form.daily_study_time.value),
+    study_days_per_week: parseInt(form.study_days_per_week.value),
+    known_skills: knownSkills
+  };
+
+  try {
+    const res = await fetch("{% url 'api-questionnaire-submit' %}", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value
+      },
+      credentials: 'same-origin',
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      errorBox.textContent = JSON.stringify(err);
+      btnNext.disabled = false;
+      btnNext.textContent = 'Generate my roadmap';
+      return;
+    }
+
+    window.location.href = "{% url 'dashboard-page' %}";
+  } catch (err) {
+    errorBox.textContent = 'Something went wrong. Please try again.';
+    btnNext.disabled = false;
+    btnNext.textContent = 'Generate my roadmap';
+  }
+});
+
+btnBack.addEventListener('click', () => {
+  if (currentStep > 1) {
+    currentStep--;
+    showStep(currentStep);
+  }
+});
+</script>
+{% endblock %}

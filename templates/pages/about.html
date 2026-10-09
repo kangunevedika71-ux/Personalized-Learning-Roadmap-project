@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}About us — PathGen{% endblock %}
+{% block content %}
+<section class="hero" style="padding-bottom:2rem;">
+  <div class="hero-copy" style="flex:2;">
+    <div class="eyebrow">About PathGen</div>
+    <h1>Most learning platforms teach everyone the same thing. We start with what you already know.</h1>
+  </div>
+</section>
+
+<div class="about-section">
+  <h2>Why we built this</h2>
+  <p>Career advice for getting your first job is usually one of two things: a generic "here's everything you need to know" list that ignores what you already have, or vague encouragement with no actual plan. Neither tells you what to study tomorrow morning.</p>
+  <p>PathGen exists to close that gap. You tell us what you know, and we tell you exactly what's left between here and the career you're aiming for — nothing you've already mastered, nothing irrelevant to the role.</p>
+
+  <h2>How the roadmap actually works</h2>
+  <p>Every career path in PathGen is mapped to a specific set of required skills, each with a priority and difficulty level. When you complete the questionnaire, we compare that list against the skills you've told us you already know, and generate a roadmap containing only the difference — in the order that makes sense to learn them.</p>
+  <p>As you complete each step, you log the hours it took. That data powers your dashboard: how much time you've put in, which subjects you've spent it on, and how close you are to done.</p>
+
+  <h2>What "done" looks like</h2>
+  <p>No open-ended checklist. Once every skill in your roadmap is marked complete, your dashboard tells you so — plainly, with the hours and progress to back it up.</p>
+
+  <h2>Built with</h2>
+  <p>PathGen runs on Django, Django REST Framework, and a small amount of vanilla JavaScript — deliberately simple, so the roadmap logic stays easy to extend with new careers and skills over time.</p>
+</div>
+{% endblock %}

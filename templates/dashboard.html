@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Dashboard — PathGen{% endblock %}
+{% block extra_head %}
+<script src="{% static 'js/vendor/chart.umd.js' %}"></script>
+{% endblock %}
+{% block content %}
+<div class="container" id="dashboard-root">
+  <p>Loading your dashboard...</p>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const csrftoken = "{{ csrf_token }}";
+const root = document.getElementById('dashboard-root');
+const expandedIds = new Set();
+
+function statusLabel(s) {
+  return {NOT_STARTED: 'Not started', IN_PROGRESS: 'In progress', COMPLETED: 'Completed'}[s] || s;
+}
+
+async function completeSkill(pathSkillId, btn) {
+  const hours = prompt('How many hours did you spend on this topic?', '2');
+  if (hours === null) return;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  await fetch(`/api/roadmap/skill/${pathSkillId}/complete/`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+    credentials: 'same-origin',
+    body: JSON.stringify({hours_logged: parseFloat(hours) || 0})
+  });
+  loadDashboard();
+}
+
+function toggleExpand(pathSkillId) {
+  if (expandedIds.has(pathSkillId)) expandedIds.delete(pathSkillId);
+  else expandedIds.add(pathSkillId);
+  loadDashboard();
+}
+
+async function toggleSubtopic(subtopicId, checkbox) {
+  checkbox.disabled = true;
+  await fetch(`/api/roadmap/subtopic/${subtopicId}/toggle/`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
+    credentials: 'same-origin',
+    body: JSON.stringify({completed: checkbox.checked})
+  });
+  loadDashboard();
+}
+
+function groupSubtopics(subtopics) {
+  const groups = [];
+  const byName = {};
+  subtopics.forEach(s => {
+    const key = s.group || 'Topics';
+    if (!byName[key]) {
+      byName[key] = { group: key, items: [] };
+      groups.push(byName[key]);
+    }
+    byName[key].items.push(s);
+  });
+  return groups;
+}
+
+function renderSubtopics(topic) {
+  const groups = groupSubtopics(topic.subtopics);
+  return `
+    <div class="subtopic-list">
+      ${groups.map(g => `
+        <div class="subtopic-group">
+          <div class="subtopic-group-title">${g.group}</div>
+          ${g.items.map(s => `
+            <label class="subtopic-item">
+              <input type="checkbox" ${s.is_completed ? 'checked' : ''}
+                     onchange="toggleSubtopic(${s.id}, this)">
+              <span class="${s.is_completed ? 'done' : ''}">${s.title}</span>
+            </label>
+          `).join('')}
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+function renderTrail(topics) {
+  return `<div class="trail">${topics.map(t => {
+    const hasSubtopics = t.subtopics_total > 0;
+    const isExpanded = expandedIds.has(t.id);
+    return `
+    <div class="trail-node ${t.status.toLowerCase()}">
+      <div class="trail-node-header" ${hasSubtopics ? `onclick="toggleExpand(${t.id})" style="cursor:pointer;"` : ''}>
+        <div>
+          <div class="title">
+            ${t.sequence}. ${t.skill_name}
+            ${hasSubtopics ? `<span class="chevron ${isExpanded ? 'open' : ''}">▾</span>` : ''}
+          </div>
+          <div class="meta">
+            ${t.category.replaceAll('_',' ')} · ~${t.duration} days · ${statusLabel(t.status)}
+            ${hasSubtopics ? ` · ${t.subtopics_completed}/${t.subtopics_total} topics` : ''}
+          </div>
+          ${t.description ? `<div class="trail-desc">${t.description}</div>` : ''}
+        </div>
+      </div>
+      ${hasSubtopics && isExpanded ? renderSubtopics(t) : ''}
+      ${!hasSubtopics ? `
+        <div class="actions">
+          <button class="btn-small" onclick="completeSkill(${t.id}, this)">Mark complete</button>
+        </div>` : ''}
+    </div>
+  `;
+  }).join('')}</div>`;
+}
+
+let skillChart, completionGauge, timelineChart;
+
+function makeCenterTextPlugin(mainText, subText) {
+  return {
+    id: 'centerText_' + Math.random().toString(36).slice(2),
+    afterDraw(chart) {
+      const { ctx, chartArea } = chart;
+      if (!chartArea) return;
+      const { width, height, left, top } = chartArea;
+      ctx.save();
+      ctx.font = "700 30px Fraunces, serif";
+      ctx.fillStyle = '#0B2942';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(mainText, left + width / 2, top + height / 2 - 8);
+      ctx.font = "600 12px Inter, sans-serif";
+      ctx.fillStyle = '#55738C';
+      ctx.fillText(subText, left + width / 2, top + height / 2 + 16);
+      ctx.restore();
+    }
+  };
+}
+
+const STATUS_COLOR = { COMPLETED: '#1FA971', IN_PROGRESS: '#00ABE4', NOT_STARTED: '#D3E4F1' };
+
+function renderCharts(data) {
+  if (typeof Chart === 'undefined') {
+    console.error('Chart.js failed to load — check static files are collected/served.');
+    return;
+  }
+
+  const skillCtx = document.getElementById('skillChart');
+  const gaugeCtx = document.getElementById('completionGauge');
+  const timelineCtx = document.getElementById('timelineChart');
+  if (!skillCtx || !gaugeCtx || !timelineCtx) return;
+
+  if (skillChart) skillChart.destroy();
+  if (completionGauge) completionGauge.destroy();
+  if (timelineChart) timelineChart.destroy();
+
+  // --- Progress by skill (horizontal bar, driven by subtopic checklist) ---
+  const bySkill = data.progress_by_skill;
+  skillChart = new Chart(skillCtx, {
+    type: 'bar',
+    data: {
+      labels: bySkill.map(s => s.skill),
+      datasets: [{
+        data: bySkill.map(s => s.percent),
+        backgroundColor: bySkill.map(s => STATUS_COLOR[s.status] || '#D3E4F1'),
+        borderRadius: 6,
+        barThickness: 16
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (ctx) => ctx.parsed.x + '% complete' } }
+      },
+      scales: {
+        x: { min: 0, max: 100, ticks: { color: '#55738C', callback: v => v + '%' }, grid: { color: '#EAF3FA' } },
+        y: { ticks: { color: '#0B2942', font: { size: 11 } }, grid: { display: false } }
+      }
+    }
+  });
+
+  // --- Overall completion gauge (doughnut + center label) ---
+  completionGauge = new Chart(gaugeCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Completed', 'Remaining'],
+      datasets: [{
+        data: [data.completed_skills, Math.max(data.total_skills - data.completed_skills, 0)],
+        backgroundColor: ['#1FA971', '#E9F1FA'],
+        borderWidth: 0,
+        cutout: '72%'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#0B2942', padding: 16, usePointStyle: true } }
+      }
+    },
+    plugins: [makeCenterTextPlugin(data.percent_complete + '%', 'complete')]
+  });
+
+  // --- Progress over time (cumulative subtopics completed) ---
+  const timeline = data.progress_over_time;
+  if (timeline.length === 0) {
+    timelineCtx.parentElement.insertAdjacentHTML(
+      'beforeend',
+      '<p style="margin-top:0.5rem;">Check off a topic to start your progress timeline.</p>'
+    );
+  } else {
+    const gradient = timelineCtx.getContext('2d').createLinearGradient(0, 0, 0, 160);
+    gradient.addColorStop(0, 'rgba(0,171,228,0.35)');
+    gradient.addColorStop(1, 'rgba(0,171,228,0.02)');
+
+    timelineChart = new Chart(timelineCtx, {
+      type: 'line',
+      data: {
+        labels: timeline.map(p => p.date),
+        datasets: [{
+          label: 'Topics completed (cumulative)',
+          data: timeline.map(p => p.cumulative),
+          borderColor: '#00ABE4',
+          backgroundColor: gradient,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 3,
+          pointBackgroundColor: '#00ABE4'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 500 },
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#55738C' }, grid: { display: false } },
+          y: { beginAtZero: true, ticks: { color: '#55738C', precision: 0 }, grid: { color: '#EAF3FA' } }
+        }
+      }
+    });
+  }
+}
+
+async function loadDashboard() {
+  const res = await fetch("{% url 'api-dashboard-summary' %}", { credentials: 'same-origin' });
+  const data = await res.json();
+
+  if (!data.has_roadmap) {
+    root.innerHTML = `
+      <div class="empty-state">
+        <h2>No roadmap yet</h2>
+        <p style="margin:0 auto;">${data.message}</p>
+        <a href="{% url 'questionnaire-page' %}" class="btn btn-primary" style="width:auto;display:inline-block;margin-top:1.5rem;">Take the questionnaire</a>
+      </div>`;
+    return;
+  }
+
+  root.innerHTML = `
+    ${data.is_completed ? `
+      <div class="congrats-banner">
+        <h2>🎉 You completed your roadmap!</h2>
+        <p>Congratulations — you're now an ex. ${data.career} Developer!</p>
+      </div>` : ''}
+
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="label">Career path</div>
+        <div class="value">${data.career}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Roadmap progress</div>
+        <div class="value green">${data.percent_complete}%</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Skills completed</div>
+        <div class="value">${data.completed_skills} / ${data.total_skills}</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Next up</div>
+        <div class="value gold" style="font-size:1.35rem;">${data.next_up ? data.next_up : 'All done 🎉'}</div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="panel">
+        <h3>Progress by skill</h3>
+        <div class="chart-wrap" style="height:${Math.max(240, data.progress_by_skill.length * 34)}px;">
+          <canvas id="skillChart"></canvas>
+        </div>
+      </div>
+      <div class="panel" style="display:flex;flex-direction:column;">
+        <h3>Overall completion</h3>
+        <div class="chart-wrap" style="flex:1;min-height:240px;">
+          <canvas id="completionGauge"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Progress over time</h3>
+      <div class="chart-wrap" style="height:220px;">
+        <canvas id="timelineChart"></canvas>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>Your roadmap</h3>
+      ${renderTrail(data.topics)}
+    </div>
+  `;
+
+  renderCharts(data);
+}
+
+loadDashboard();
+</script>
+{% endblock %}

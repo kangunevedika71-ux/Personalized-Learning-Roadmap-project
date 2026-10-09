@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Contact us — PathGen{% endblock %}
+{% block content %}
+<div class="contact-wrap">
+  <div class="contact-info">
+    <div class="eyebrow" style="color:var(--accent-dark);font-weight:600;margin-bottom:0.6rem;">Get in touch</div>
+    <h2>Questions, feedback, or a career path we're missing?</h2>
+    <p>We read every message. Tell us what's on your mind and we'll get back to you.</p>
+    <div class="info-item">
+      <div class="label">Email</div>
+      <div class="value">kangunevedika@gmial.com</div>
+    </div>
+    <div class="info-item">
+      <div class="label">Phone</div>
+      <div class="value">+91 79728 66940</div>
+    </div>
+    <div class="info-item">
+      <div class="label">Support hours</div>
+      <div class="value">Available 24/7</div>
+    </div>
+    <div class="info-item">
+      <div class="label">For roadmap suggestions</div>
+      <div class="value">Tell us the career and the skills it should include</div>
+    </div>
+  </div>
+
+  <div class="contact-form-panel">
+    {% if messages %}
+    <ul class="messages">
+      {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      <div class="field">
+        <label for="id_name">Name</label>
+        {{ form.name }}
+      </div>
+      <div class="field">
+        <label for="id_email">Email</label>
+        {{ form.email }}
+      </div>
+      <div class="field">
+        <label for="id_subject">Subject</label>
+        {{ form.subject }}
+      </div>
+      <div class="field">
+        <label for="id_message">Message</label>
+        {{ form.message }}
+      </div>
+      <button type="submit" class="btn btn-primary">Send message</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

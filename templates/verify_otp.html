@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Verify OTP — PathGen{% endblock %}
+{% block content %}
+<div class="auth-wrap">
+  {% include "partials/auth_side.html" with heading="Almost there." blurb="We sent a one-time password to confirm this number is yours." %}
+  <div class="auth-form-panel">
+    <div class="auth-card">
+      <h2>Enter your OTP</h2>
+      <p class="sub">We sent a {{ ttl_minutes }}-minute code to <strong>{{ masked_number }}</strong>.</p>
+      {% if messages %}
+      <ul class="messages">
+        {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+
+      <form method="post">
+        {% csrf_token %}
+        <div class="field">
+          <label for="id_code">6-digit OTP</label>
+          {{ form.code }}
+          {% if form.code.errors %}<ul class="form-errors">{% for e in form.code.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary">{% if purpose == 'SIGNUP' %}Verify &amp; create account{% else %}Verify &amp; log in{% endif %}</button>
+      </form>
+
+      <div class="otp-actions">
+        <form method="post" action="{% url 'resend-otp' %}" id="resend-form">
+          {% csrf_token %}
+          <button type="submit" class="link-btn" id="resend-btn" {% if resend_wait %}disabled{% endif %}>
+            Resend OTP<span id="resend-timer">{% if resend_wait %} in {{ resend_wait }}s{% endif %}</span>
+          </button>
+        </form>
+        <a href="{% url 'change-number' %}">Wrong number?</a>
+      </div>
+      <script>
+        (function () {
+          let wait = {{ resend_wait|default:0 }};
+          const btn = document.getElementById('resend-btn');
+          const label = document.getElementById('resend-timer');
+          if (wait <= 0) return;
+          const t = setInterval(() => {
+            wait--;
+            if (wait <= 0) { clearInterval(t); btn.disabled = false; label.textContent = ''; }
+            else label.textContent = ' in ' + wait + 's';
+          }, 1000);
+        })();
+      </script>
+    </div>
+  </div>
+</div>
+{% endblock %}
